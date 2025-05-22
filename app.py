@@ -30,7 +30,8 @@ async def get_chute_response(prompt):
 
     headers = {
         "Authorization": f"Bearer {config['api_token']}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept-Charset": "utf-8"  # Явно указываем UTF-8
     }
 
     payload = {
@@ -50,9 +51,10 @@ async def get_chute_response(prompt):
 
                 data = await response.json()
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
-                # Преобразуем Unicode-экранированные символы в нормальные
-                if isinstance(content, str):
-                    content = content.encode('utf-8').decode('unicode-escape')
+
+                # Исправляем кодировку, если пришли кракозябры
+                if "Ð" in content:  # Если есть признаки CP1251 → UTF-8 ошибки
+                    content = content.encode('utf-8').decode('cp1251')  # Декодируем правильно
                 return content
 
     except Exception as e:
@@ -74,10 +76,10 @@ async def ai():
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
 
-        # Возвращаем как обычный текст с правильной кодировкой
+        # Возвращаем ответ как текст с правильной кодировкой
         return Response(
-            response if isinstance(response, str) else json.dumps(response),
-            mimetype='text/plain; charset=utf-8'
+            response,
+            content_type='text/plain; charset=utf-8'
         )
 
     except Exception as e:
