@@ -1,9 +1,22 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify
 import aiohttp
 import asyncio
-import json
+from functools import wraps
 
 app = Flask(__name__)
+
+# Декоратор для запуска async функций в синхронном Flask
+def async_route(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(f(*args, **kwargs))
+            return result
+        finally:
+            loop.close()
+    return wrapper
 
 @app.route('/')
 def home():
@@ -12,11 +25,11 @@ def home():
 async def get_chute_response(prompt):
     config = {
         "api_url": "https://llm.chutes.ai/v1/chat/completions",
-        "api_token": "ваш_токен",  # замените на реальный токен
+        "api_token": "cpk_87c1ab80f98d4d4a9d019ece666385a9.a6d88321b7935a319035a323a1ae2a18.FX6HxQeeUOGEJqRicmakDXPvO4X1vy7a",  # замените на реальный токен
         "model": "deepseek-ai/DeepSeek-V3-0324",
         "temperature": 0.8,
         "max_tokens": 1024,
-        "stream": False  # сначала сделаем без потокового вывода
+        "stream": False
     }
 
     headers = {
@@ -46,22 +59,19 @@ async def get_chute_response(prompt):
         return {"error": str(e)}
 
 @app.route('/ai', methods=['POST'])
+@async_route
 async def ai():
     try:
-        # Проверяем Content-Type
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
 
         data = request.get_json()
 
-        # Проверяем наличие prompt
         if not data or 'prompt' not in data:
             return jsonify({"error": "Prompt is required in JSON body"}), 400
 
-        # Получаем ответ от API
         response = await get_chute_response(data['prompt'])
 
-        # Обрабатываем ошибки
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
 
@@ -69,6 +79,3 @@ async def ai():
 
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
