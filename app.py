@@ -1,11 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 import aiohttp
 import asyncio
 from functools import wraps
+import json
 
 app = Flask(__name__)
 
-# Декоратор для запуска async функций в синхронном Flask
 def async_route(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -17,10 +17,6 @@ def async_route(f):
         finally:
             loop.close()
     return wrapper
-
-@app.route('/')
-def home():
-    return "Сервер работает. Используйте POST /ai с JSON {'prompt':'ваш запрос'}"
 
 async def get_chute_response(prompt):
     config = {
@@ -34,8 +30,7 @@ async def get_chute_response(prompt):
 
     headers = {
         "Authorization": f"Bearer {config['api_token']}",
-        "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Content-Type": "application/json"
     }
 
     payload = {
@@ -53,8 +48,12 @@ async def get_chute_response(prompt):
                     error_msg = await response.text()
                     return {"error": f"API error: {response.status} - {error_msg}"}
 
-                data = await response.json(content_type=None)
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
+                data = await response.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
+                # Преобразуем Unicode-экранированные символы в нормальные
+                if isinstance(content, str):
+                    content = content.encode('utf-8').decode('unicode-escape')
+                return content
 
     except Exception as e:
         return {"error": str(e)}
@@ -67,7 +66,6 @@ async def ai():
             return jsonify({"error": "Content-Type must be application/json"}), 400
 
         data = request.get_json()
-
         if not data or 'prompt' not in data:
             return jsonify({"error": "Prompt is required in JSON body"}), 400
 
@@ -76,11 +74,14 @@ async def ai():
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
 
-        # Убедимся, что ответ правильно кодируется как UTF-8
-        if isinstance(response, str):
-            response = response.encode('utf-8').decode('unicode-escape')
-
-        return jsonify({"response": response}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        # Возвращаем как обычный текст с правильной кодировкой
+        return Response(
+            response if isinstance(response, str) else json.dumps(response),
+            mimetype='text/plain; charset=utf-8'
+        )
 
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+if __name__ == '__main__':
+    app.run()
