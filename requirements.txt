@@ -1,0 +1,2 @@
+flask==3.0.0
+gunicorn==21.2.0  # Для WSGI-сервера (обязательно для Flask/Django)
