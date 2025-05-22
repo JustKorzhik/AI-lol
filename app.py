@@ -25,7 +25,7 @@ def home():
 async def get_chute_response(prompt):
     config = {
         "api_url": "https://llm.chutes.ai/v1/chat/completions",
-        "api_token": "cpk_87c1ab80f98d4d4a9d019ece666385a9.a6d88321b7935a319035a323a1ae2a18.FX6HxQeeUOGEJqRicmakDXPvO4X1vy7a",  # замените на реальный токен
+        "api_token": "cpk_87c1ab80f98d4d4a9d019ece666385a9.a6d88321b7935a319035a323a1ae2a18.FX6HxQeeUOGEJqRicmakDXPvO4X1vy7a",
         "model": "deepseek-ai/DeepSeek-V3-0324",
         "temperature": 0.8,
         "max_tokens": 1024,
@@ -34,7 +34,8 @@ async def get_chute_response(prompt):
 
     headers = {
         "Authorization": f"Bearer {config['api_token']}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
 
     payload = {
@@ -52,7 +53,7 @@ async def get_chute_response(prompt):
                     error_msg = await response.text()
                     return {"error": f"API error: {response.status} - {error_msg}"}
 
-                data = await response.json()
+                data = await response.json(content_type=None)
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
 
     except Exception as e:
@@ -75,7 +76,11 @@ async def ai():
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
 
-        return jsonify({"response": response})
+        # Убедимся, что ответ правильно кодируется как UTF-8
+        if isinstance(response, str):
+            response = response.encode('utf-8').decode('unicode-escape')
+
+        return jsonify({"response": response}), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
