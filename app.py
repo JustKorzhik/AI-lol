@@ -72,6 +72,7 @@ async def ai():
             return jsonify({"error": "Prompt is required in JSON body"}), 400
 
         response = await get_chute_response(data['prompt'])
+        response = respone + data['nickname']
 
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
