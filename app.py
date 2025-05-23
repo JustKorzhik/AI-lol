@@ -24,7 +24,7 @@ async def get_chute_response(prompt):
         "api_token": "cpk_87c1ab80f98d4d4a9d019ece666385a9.a6d88321b7935a319035a323a1ae2a18.FX6HxQeeUOGEJqRicmakDXPvO4X1vy7a",
         "model": "deepseek-ai/DeepSeek-V3-0324",
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 10240,
         "stream": False
     }
 
