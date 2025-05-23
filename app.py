@@ -21,7 +21,7 @@ def async_route(f):
             loop.close()
     return wrapper
 
-async def get_chute_response_async(prompt):
+async def get_chute_response_async(prompt, nickname):
     config = {
         "api_url": "https://llm.chutes.ai/v1/chat/completions",
         "api_token": "cpk_87c1ab80f98d4d4a9d019ece666385a9.a6d88321b7935a319035a323a1ae2a18.FX6HxQeeUOGEJqRicmakDXPvO4X1vy7a",
@@ -62,6 +62,9 @@ async def get_chute_response_async(prompt):
                     return {"error": f"API error: {response.status} - {error_msg}"}
 
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
+                # Добавляем никнейм в конец ответа
+                if nickname and not content.endswith(f"\n\n&7@{nickname}"):
+                    content += f"\n\n&7@{nickname}"
                 return content
 
     except asyncio.TimeoutError:
@@ -69,57 +72,29 @@ async def get_chute_response_async(prompt):
     except Exception as e:
         return {"error": f"Request failed: {str(e)}"}
 
-def get_chute_response(prompt):
+def get_chute_response(prompt, nickname):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(get_chute_response_async(prompt))
+        return loop.run_until_complete(get_chute_response_async(prompt, nickname))
     finally:
         loop.close()
 
-@app.route('/ai', methods=['POST'])
-def ai():
-    try:
-        if not request.is_json:
-            return jsonify({"error": "Content-Type must be application/json"}), 400
-
-        data = request.get_json()
-        if not data or 'prompt' not in data:
-            return jsonify({"error": "Prompt is required in JSON body"}), 400
-
-        # Запускаем запрос в отдельном потоке
-        future = executor.submit(get_chute_response, data['prompt'])
-        
-        # Ждем до 2 секунд для быстрого ответа
-        start_time = time.time()
-        try:
-            response = future.result(timeout=2)
-            # Если ответ получен быстро, возвращаем его сразу
-            nickname = data.get('nickname', '')
-            if nickname and isinstance(response, str):
-                response = f"{response}\n\n— {nickname}"
-            return Response(response, content_type='text/plain; charset=utf-8', status=200)
-        except TimeoutError:
-            # Если ответ не получен за 2 секунды, возвращаем 200 и продолжаем обработку
-            def generate():
-                # Ждем завершения запроса
-                response = future.result()
-                if isinstance(response, dict) and 'error' in response:
-                    yield json.dumps(response)
-                else:
-                    nickname = data.get('nickname', '')
-                    if nickname and isinstance(response, str):
-                        response = f"{response}\n\n— {nickname}"
-                    yield response
-
-            return Response(
-                generate(),
-                content_type='text/plain; charset=utf-8',
-                status=200
-            )
-
-    except Exception as e:
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+@app.route('/generate', methods=['POST'])
+def generate_response():
+    data = request.get_json()
+    prompt = data.get('prompt')
+    nickname = data.get('nickname')
+    
+    if not prompt:
+        return jsonify({"error": "Prompt is required"}), 400
+    
+    response = get_chute_response(prompt, nickname)
+    
+    if isinstance(response, dict) and 'error' in response:
+        return jsonify(response), 500
+    
+    return jsonify({"response": response})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
