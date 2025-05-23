@@ -36,7 +36,7 @@ async def get_chute_response(prompt):
 
     payload = {
         "model": config["model"],
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": prompt}, {"role": "system", "content": "используй форматирование майнкрафта со знаком &"}],
         "temperature": config["temperature"],
         "max_tokens": config["max_tokens"],
         "stream": config["stream"]
