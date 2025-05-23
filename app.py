@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, Response
 import aiohttp
 import asyncio
 from functools import wraps
+import json
 
 app = Flask(__name__)
 
@@ -24,13 +25,13 @@ async def get_chute_response(prompt):
         "model": "deepseek-ai/DeepSeek-V3-0324",
         "temperature": 0.8,
         "max_tokens": 1024,
-        "stream": False  # Убедитесь, что streaming отключен
+        "stream": False
     }
 
     headers = {
         "Authorization": f"Bearer {config['api_token']}",
         "Content-Type": "application/json",
-        "Accept": "application/json"  # Явно указываем, что ожидаем JSON
+        "Accept": "application/json"
     }
 
     payload = {
@@ -47,9 +48,9 @@ async def get_chute_response(prompt):
                 config["api_url"],
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30) as response:
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 
-                # Дожидаемся полного ответа
                 response_data = await response.read()
                 data = json.loads(response_data.decode('utf-8'))
                 
@@ -81,12 +82,10 @@ async def ai():
         if isinstance(response, dict) and 'error' in response:
             return jsonify(response), 500
 
-        # Добавляем никнейм в конец ответа, если он указан
         nickname = data.get('nickname', '')
         if nickname:
             response = f"{response}\n\n— {nickname}"
 
-        # Возвращаем полный ответ одним куском
         return Response(
             response,
             content_type='text/plain; charset=utf-8',
