@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, Response
 import aiohttp
 import asyncio
 from functools import wraps
-import json
 
 app = Flask(__name__)
 
@@ -25,13 +24,13 @@ async def get_chute_response(prompt):
         "model": "deepseek-ai/DeepSeek-V3-0324",
         "temperature": 0.8,
         "max_tokens": 1024,
-        "stream": False
+        "stream": False  # Убедитесь, что streaming отключен
     }
 
     headers = {
         "Authorization": f"Bearer {config['api_token']}",
         "Content-Type": "application/json",
-        "Accept-Charset": "utf-8"  # Явно указываем UTF-8
+        "Accept": "application/json"  # Явно указываем, что ожидаем JSON
     }
 
     payload = {
@@ -44,21 +43,27 @@ async def get_chute_response(prompt):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(config["api_url"], headers=headers, json=payload) as response:
+            async with session.post(
+                config["api_url"],
+                headers=headers,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=30) as response:
+                
+                # Дожидаемся полного ответа
+                response_data = await response.read()
+                data = json.loads(response_data.decode('utf-8'))
+                
                 if response.status != 200:
-                    error_msg = await response.text()
+                    error_msg = data.get("error", {}).get("message", "Unknown error")
                     return {"error": f"API error: {response.status} - {error_msg}"}
 
-                data = await response.json()
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
-
-                # Исправляем кодировку, если пришли кракозябры
-                if "Ð" in content:  # Если есть признаки CP1251 → UTF-8 ошибки
-                    content = content.encode('utf-8').decode('cp1251')  # Декодируем правильно
                 return content
 
+    except asyncio.TimeoutError:
+        return {"error": "API request timed out"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Request failed: {str(e)}"}
 
 @app.route('/ai', methods=['POST'])
 @async_route
@@ -79,16 +84,17 @@ async def ai():
         # Добавляем никнейм в конец ответа, если он указан
         nickname = data.get('nickname', '')
         if nickname:
-            response = f"{response}\n{nickname}"
+            response = f"{response}\n\n— {nickname}"
 
-        # Возвращаем ответ как текст с правильной кодировкой
+        # Возвращаем полный ответ одним куском
         return Response(
             response,
-            content_type='text/plain; charset=utf-8'
+            content_type='text/plain; charset=utf-8',
+            status=200
         )
 
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
