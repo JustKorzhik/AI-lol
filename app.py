@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, stream_with_context
 import aiohttp
 import asyncio
 from functools import wraps
 import json
+import time
 
 app = Flask(__name__)
 
@@ -76,17 +77,32 @@ async def ai():
         if not data or 'prompt' not in data:
             return jsonify({"error": "Prompt is required in JSON body"}), 400
 
-        response = await get_chute_response(data['prompt'])
-
-        if isinstance(response, dict) and 'error' in response:
-            return jsonify(response), 500
-
-        nickname = data.get('nickname', '')
-        if nickname:
-            response = f"{response}\n\n— {nickname}"
+        # Начинаем обработку запроса
+        start_time = time.time()
+        
+        # Создаем генератор для потоковой передачи
+        def generate():
+            # Сначала отправляем пустой ответ с кодом 200
+            yield ""
+            
+            # Затем ждем ответ от API
+            response = asyncio.run(get_chute_response(data['prompt']))
+            
+            # Если прошло меньше 2 секунд, ждем оставшееся время
+            elapsed = time.time() - start_time
+            if elapsed < 2:
+                time.sleep(2 - elapsed)
+            
+            if isinstance(response, dict) and 'error' in response:
+                yield json.dumps(response)
+            else:
+                nickname = data.get('nickname', '')
+                if nickname:
+                    response = f"{response}\n\n— {nickname}"
+                yield response
 
         return Response(
-            response,
+            stream_with_context(generate()),
             content_type='text/plain; charset=utf-8',
             status=200
         )
