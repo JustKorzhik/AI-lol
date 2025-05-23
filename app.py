@@ -48,7 +48,7 @@ async def get_chute_response(prompt):
                 config["api_url"],
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=30, connect=20)
             ) as response:
                 
                 response_data = await response.read()
