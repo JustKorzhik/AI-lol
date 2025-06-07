@@ -32,8 +32,7 @@ def get_wiki_style_descriptions(query, num=3):
                     first_p = soup.find("p")
                     if first_p:
                         description = first_p.get_text().strip()[:200] + "..."  # Ограничиваем длину
-                
-                titlelist.append(f"🌐 {url}\n📌 {title}\n📖 {description}")
+                titlelist.append([url, title, description])
                 
             except Exception as e:
                 titlelist.append(f"⚠️ Ошибка при обработке {url}: {str(e)[:50]}...\n")
@@ -46,12 +45,6 @@ def get_wiki_style_descriptions(query, num=3):
 def search_test():
     test = get_wiki_style_descriptions("пельмени", num=5)
     return jsonify(test), 200
-# Пример с запросом про дельфинов (как в Википедии)
-# while True:
-#    os.system('cls' if os.name == 'nt' else 'clear')
-#    okak = input(":??:\n")
-#    print(get_wiki_style_descriptions(okak, num=5))
-#    input("Нажмите ентер чтобы перезапуститься")
 
 if __name__ == '__main__':    
     app.run(debug=True, host='0.0.0.0', port=5000)
